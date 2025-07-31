@@ -149,24 +149,9 @@
         </div>
     </div>
 
+    <!-- Load Retell SDK directly -->
+    <script src="https://cdn.jsdelivr.net/npm/retell-client-js-sdk@latest/dist/retell-client.min.js"></script>
     <script>
-        // Load Retell SDK dynamically
-        function loadRetellSDK() {
-            return new Promise((resolve, reject) => {
-                const script = document.createElement('script');
-                script.src = 'https://unpkg.com/retell-client-js-sdk@latest/dist/retell-client.min.js';
-                script.onload = () => {
-                    console.log('Retell SDK loaded successfully');
-                    resolve();
-                };
-                script.onerror = () => {
-                    console.error('Failed to load Retell SDK');
-                    reject(new Error('Failed to load Retell SDK'));
-                };
-                document.head.appendChild(script);
-            });
-        }
-
         // Configuration
         const CONFIG = {
             backendUrl: 'https://omnihive-webagent.netlify.app/.netlify/functions/create-call',
@@ -185,34 +170,53 @@
         let callButton, status, agentStatus, agentIndicator, agentStatusText, transcript, transcriptContent;
 
         // Initialize app
-        async function initializeApp() {
-            try {
-                console.log('Initializing Omnihive Web Agent...');
-                
-                // Get UI elements
-                callButton = document.getElementById('callButton');
-                status = document.getElementById('status');
-                agentStatus = document.getElementById('agentStatus');
-                agentIndicator = document.getElementById('agentIndicator');
-                agentStatusText = document.getElementById('agentStatusText');
-                transcript = document.getElementById('transcript');
-                transcriptContent = document.getElementById('transcriptContent');
+        function initializeApp() {
+            console.log('Initializing Omnihive Web Agent...');
+            
+            // Get UI elements
+            callButton = document.getElementById('callButton');
+            status = document.getElementById('status');
+            agentStatus = document.getElementById('agentStatus');
+            agentIndicator = document.getElementById('agentIndicator');
+            agentStatusText = document.getElementById('agentStatusText');
+            transcript = document.getElementById('transcript');
+            transcriptContent = document.getElementById('transcriptContent');
 
-                // Load Retell SDK
-                await loadRetellSDK();
+            // Check if Retell SDK loaded
+            if (typeof RetellWebClient === 'undefined') {
+                console.error('RetellWebClient not available');
+                showStatus('Loading SDK... Please wait and try again.', 'error');
                 
+                // Try to reload SDK after a delay
+                setTimeout(() => {
+                    if (typeof RetellWebClient !== 'undefined') {
+                        console.log('SDK loaded on retry');
+                        setupRetellClient();
+                    } else {
+                        showStatus('SDK failed to load. Please refresh the page.', 'error');
+                    }
+                }, 3000);
+                return;
+            }
+
+            setupRetellClient();
+        }
+
+        function setupRetellClient() {
+            try {
                 // Initialize Retell client
                 retellWebClient = new RetellWebClient();
-                console.log('RetellWebClient initialized');
+                console.log('RetellWebClient initialized successfully');
                 
                 // Set up event listeners
                 setupEventListeners();
                 
-                console.log('App initialized successfully with agent:', agentId);
+                console.log('App ready with agent:', agentId);
+                showStatus('Ready to call!', 'active');
                 
             } catch (error) {
-                console.error('Failed to initialize app:', error);
-                showStatus('Failed to load. Please refresh the page.', 'error');
+                console.error('Error setting up Retell client:', error);
+                showStatus('Setup error: ' + error.message, 'error');
             }
         }
 
@@ -284,14 +288,16 @@
 
         // Update status display
         function showStatus(message, type) {
-            status.textContent = message;
-            status.className = `status ${type}`;
-            status.style.display = 'block';
+            if (status) {
+                status.textContent = message;
+                status.className = `status ${type}`;
+                status.style.display = 'block';
+            }
         }
 
         // Update transcript
         function updateTranscript(update) {
-            if (update.transcript) {
+            if (update.transcript && transcriptContent) {
                 transcriptContent.innerHTML += `<div>${update.transcript}</div>`;
                 transcript.scrollTop = transcript.scrollHeight;
             }
