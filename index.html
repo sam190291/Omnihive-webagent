@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omnihive Web Agent</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .call-container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        
+        .call-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            margin: 10px;
+            min-width: 150px;
+        }
+        
+        .call-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .call-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .status {
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .status.connecting {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .status.active {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .transcript {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            text-align: left;
+            min-height: 100px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .agent-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background-color: #28a745;
+            border-radius: 50%;
+            margin-right: 5px;
+            animation: pulse 1s infinite;
+        }
+        
+        .agent-indicator.talking {
+            animation: pulse 0.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .embed-info {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            text-align: left;
+        }
+        
+        .embed-code {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 12px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="call-container">
+        <h2>Omnihive AI Assistant</h2>
+        
+        <button id="callButton" class="call-button">
+            🎤 Start Call
+        </button>
+        
+        <div id="status" class="status" style="display: none;"></div>
+        
+        <div id="agentStatus" style="display: none;">
+            <span class="agent-indicator" id="agentIndicator"></span>
+            <span id="agentStatusText">Agent Ready</span>
+        </div>
+        
+        <div id="transcript" class="transcript" style="display: none;">
+            <strong>Conversation:</strong><br>
+            <div id="transcriptContent"></div>
+        </div>
+        
+        <div class="embed-info">
+            <h3>For Frontend Team:</h3>
+            <p>To embed this button, just add this iframe to your website:</p>
+            <div class="embed-code">
+                &lt;iframe src="https://omnihive-webagent.netlify.app/?agentId=YOUR_AGENT_ID" width="100%" height="500" frameborder="0"&gt;&lt;/iframe&gt;
+            </div>
+            <p><strong>To use different agents:</strong> Just change the agentId parameter in the URL</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/retell-client-js-sdk@latest/dist/retell-client.min.js"></script>
+    <script>
+        // Configuration - You'll need to update these
+        const CONFIG = {
+            // Your backend API endpoint (we'll create this next)
+            backendUrl: 'https://your-netlify-functions.netlify.app/.netlify/functions/create-call',
+            // Default agent ID (can be overridden by URL parameter)
+            defaultAgentId: 'your-default-agent-id'
+        };
+
+        // Get agent ID from URL parameter or use default
+        const urlParams = new URLSearchParams(window.location.search);
+        const agentId = urlParams.get('agentId') || CONFIG.defaultAgentId;
+
+        // Initialize Retell client
+        const retellWebClient = new RetellWebClient();
+        
+        // UI elements
+        const callButton = document.getElementById('callButton');
+        const status = document.getElementById('status');
+        const agentStatus = document.getElementById('agentStatus');
+        const agentIndicator = document.getElementById('agentIndicator');
+        const agentStatusText = document.getElementById('agentStatusText');
+        const transcript = document.getElementById('transcript');
+        const transcriptContent = document.getElementById('transcriptContent');
+        
+        let isCallActive = false;
+
+        // Update status display
+        function showStatus(message, type) {
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+        }
+
+        // Update transcript
+        function updateTranscript(update) {
+            if (update.transcript) {
+                transcriptContent.innerHTML += `<div>${update.transcript}</div>`;
+                transcript.scrollTop = transcript.scrollHeight;
+            }
+        }
+
+        // Call button click handler
+        callButton.addEventListener('click', async () => {
+            if (!isCallActive) {
+                await startCall();
+            } else {
+                stopCall();
+            }
+        });
+
+        // Start call function
+        async function startCall() {
+            try {
+                callButton.disabled = true;
+                showStatus('Connecting...', 'connecting');
+
+                // Call your backend to create the call
+                const response = await fetch(CONFIG.backendUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        agentId: agentId
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const callData = await response.json();
+
+                // Start the call with Retell
+                await retellWebClient.startCall({
+                    accessToken: callData.access_token,
+                    sampleRate: 24000,
+                    emitRawAudioSamples: false
+                });
+
+            } catch (error) {
+                console.error('Error starting call:', error);
+                showStatus('Failed to start call. Please try again.', 'error');
+                callButton.disabled = false;
+            }
+        }
+
+        // Stop call function
+        function stopCall() {
+            retellWebClient.stopCall();
+        }
+
+        // Event listeners
+        retellWebClient.on("call_started", () => {
+            console.log("Call started");
+            isCallActive = true;
+            callButton.textContent = "🔴 End Call";
+            callButton.disabled = false;
+            showStatus('Call Active - Speak now!', 'active');
+            agentStatus.style.display = 'block';
+            transcript.style.display = 'block';
+        });
+
+        retellWebClient.on("call_ended", () => {
+            console.log("Call ended");
+            isCallActive = false;
+            callButton.textContent = "🎤 Start Call";
+            callButton.disabled = false;
+            status.style.display = 'none';
+            agentStatus.style.display = 'none';
+            agentIndicator.classList.remove('talking');
+            agentStatusText.textContent = 'Agent Ready';
+        });
+
+        retellWebClient.on("agent_start_talking", () => {
+            console.log("Agent started talking");
+            agentIndicator.classList.add('talking');
+            agentStatusText.textContent = 'Agent Speaking...';
+        });
+
+        retellWebClient.on("agent_stop_talking", () => {
+            console.log("Agent stopped talking");
+            agentIndicator.classList.remove('talking');
+            agentStatusText.textContent = 'Agent Listening...';
+        });
+
+        retellWebClient.on("update", (update) => {
+            console.log("Update received:", update);
+            updateTranscript(update);
+        });
+
+        retellWebClient.on("error", (error) => {
+            console.error("Retell error:", error);
+            showStatus('Call error occurred. Please try again.', 'error');
+            isCallActive = false;
+            callButton.textContent = "🎤 Start Call";
+            callButton.disabled = false;
+            retellWebClient.stopCall();
+        });
+
+        // Update the embed code with current URL
+        window.addEventListener('load', () => {
+            const currentDomain = window.location.origin;
+            const embedCode = document.querySelector('.embed-code');
+            embedCode.innerHTML = embedCode.innerHTML.replace('https://your-netlify-site.netlify.app', currentDomain);
+        });
+    </script>
+</body>
+</html>
