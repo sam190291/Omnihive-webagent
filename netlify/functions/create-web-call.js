@@ -26,8 +26,18 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Parse request body
-    const { agentId } = JSON.parse(event.body);
+    // Parse request body safely
+    let agentId;
+    try {
+      const body = JSON.parse(event.body || '{}');
+      agentId = body.agentId;
+    } catch (parseError) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Invalid JSON in request body' })
+      };
+    }
 
     if (!agentId) {
       return {
@@ -37,7 +47,7 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Your Retell API key (set this in Netlify environment variables)
+    // Your Retell API key
     const retellApiKey = process.env.RETELL_API_KEY;
     
     if (!retellApiKey) {
@@ -49,8 +59,10 @@ exports.handler = async (event, context) => {
       };
     }
 
+    console.log('Calling Retell API for agent:', agentId);
+
     // Call Retell API to create web call
-    const response = await fetch('https://api.retellai.com/create-web-call', {
+    const retellResponse = await fetch('https://api.retellai.com/create-web-call', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${retellApiKey}`,
@@ -65,20 +77,24 @@ exports.handler = async (event, context) => {
       })
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Retell API error:', response.status, errorText);
+    console.log('Retell API response status:', retellResponse.status);
+
+    if (!retellResponse.ok) {
+      const errorText = await retellResponse.text();
+      console.error('Retell API error:', retellResponse.status, errorText);
       return {
-        statusCode: response.status,
+        statusCode: retellResponse.status,
         headers,
         body: JSON.stringify({ 
-          error: 'Failed to create call',
-          details: errorText 
+          error: 'Failed to create call with Retell',
+          details: errorText,
+          status: retellResponse.status
         })
       };
     }
 
-    const callData = await response.json();
+    const callData = await retellResponse.json();
+    console.log('Call created successfully');
 
     return {
       statusCode: 200,
@@ -87,13 +103,14 @@ exports.handler = async (event, context) => {
     };
 
   } catch (error) {
-    console.error('Error creating call:', error);
+    console.error('Error in function:', error);
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({ 
         error: 'Internal server error',
-        message: error.message 
+        message: error.message,
+        stack: error.stack
       })
     };
   }
