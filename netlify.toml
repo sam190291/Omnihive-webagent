@@ -1,16 +1,10 @@
 [build]
+  command = "npm run netlify-build"
   functions = "netlify/functions"
-  publish = "."
+  publish = "dist"
 
 [build.environment]
   NODE_VERSION = "18"
-
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "SAMEORIGIN"
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
 
 [[headers]]
   for = "/.netlify/functions/*"
@@ -18,3 +12,9 @@
     Access-Control-Allow-Origin = "*"
     Access-Control-Allow-Headers = "Content-Type"
     Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
