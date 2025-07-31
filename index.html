@@ -149,154 +149,213 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/retell-client-js-sdk@latest/dist/retell-client.min.js"></script>
+    <!-- Remove the old script tag since we're loading dynamically -->
     <script>
-        // Configuration - You'll need to update these
-        const CONFIG = {
-            // Your backend API endpoint (we'll create this next)
-               backendUrl: 'https://omnihive-webagent.netlify.app/.netlify/functions/create-call',
-            // Default agent ID (can be overridden by URL parameter)
-            defaultAgentId: 'your-default-agent-id'
-        };
-
-        // Get agent ID from URL parameter or use default
-        const urlParams = new URLSearchParams(window.location.search);
-        const agentId = urlParams.get('agentId') || CONFIG.defaultAgentId;
-
-        // Initialize Retell client
-        const retellWebClient = new RetellWebClient();
-        
-        // UI elements
-        const callButton = document.getElementById('callButton');
-        const status = document.getElementById('status');
-        const agentStatus = document.getElementById('agentStatus');
-        const agentIndicator = document.getElementById('agentIndicator');
-        const agentStatusText = document.getElementById('agentStatusText');
-        const transcript = document.getElementById('transcript');
-        const transcriptContent = document.getElementById('transcriptContent');
-        
-        let isCallActive = false;
-
-        // Update status display
-        function showStatus(message, type) {
-            status.textContent = message;
-            status.className = `status ${type}`;
-            status.style.display = 'block';
+    <script>
+        // Load Retell SDK dynamically and initialize when ready
+        function loadRetellSDK() {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://unpkg.com/retell-client-js-sdk@latest/dist/retell-client.min.js';
+                script.onload = () => {
+                    console.log('Retell SDK loaded successfully');
+                    resolve();
+                };
+                script.onerror = () => {
+                    console.error('Failed to load Retell SDK');
+                    reject(new Error('Failed to load Retell SDK'));
+                };
+                document.head.appendChild(script);
+            });
         }
 
-        // Update transcript
-        function updateTranscript(update) {
-            if (update.transcript) {
-                transcriptContent.innerHTML += `<div>${update.transcript}</div>`;
-                transcript.scrollTop = transcript.scrollHeight;
-            }
-        }
-
-        // Call button click handler
-        callButton.addEventListener('click', async () => {
-            if (!isCallActive) {
-                await startCall();
-            } else {
-                stopCall();
-            }
-        });
-
-        // Start call function
-        async function startCall() {
+        // Wait for SDK to load before initializing
+        async function initializeApp() {
             try {
-                callButton.disabled = true;
-                showStatus('Connecting...', 'connecting');
-
-                // Call your backend to create the call
-                const response = await fetch(CONFIG.backendUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        agentId: agentId
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const callData = await response.json();
-
-                // Start the call with Retell
-                await retellWebClient.startCall({
-                    accessToken: callData.access_token,
-                    sampleRate: 24000,
-                    emitRawAudioSamples: false
-                });
-
+                await loadRetellSDK();
+                
+                // Now initialize everything
+                initializeRetellApp();
+                
             } catch (error) {
-                console.error('Error starting call:', error);
-                showStatus('Failed to start call. Please try again.', 'error');
-                callButton.disabled = false;
+                console.error('Failed to initialize app:', error);
+                document.getElementById('status').innerHTML = 'Failed to load. Please refresh the page.';
+                document.getElementById('status').className = 'status error';
+                document.getElementById('status').style.display = 'block';
             }
         }
 
-        // Stop call function
-        function stopCall() {
-            retellWebClient.stopCall();
-        }
+        function initializeRetellApp() {
+            // Configuration - You'll need to update these
+            const CONFIG = {
+                // Your backend API endpoint (we'll create this next)
+                backendUrl: 'https://omnihive-webagent.netlify.app/.netlify/functions/create-call',
+                // Default agent ID (can be overridden by URL parameter)
+                defaultAgentId: 'agent_af91e55018eeeb36e5a2397bfb'
+            };
 
-        // Event listeners
-        retellWebClient.on("call_started", () => {
-            console.log("Call started");
-            isCallActive = true;
-            callButton.textContent = "🔴 End Call";
-            callButton.disabled = false;
-            showStatus('Call Active - Speak now!', 'active');
-            agentStatus.style.display = 'block';
-            transcript.style.display = 'block';
-        });
+            // Get agent ID from URL parameter or use default
+            const urlParams = new URLSearchParams(window.location.search);
+            const agentId = urlParams.get('agentId') || CONFIG.defaultAgentId;
 
-        retellWebClient.on("call_ended", () => {
-            console.log("Call ended");
-            isCallActive = false;
-            callButton.textContent = "🎤 Start Call";
-            callButton.disabled = false;
-            status.style.display = 'none';
-            agentStatus.style.display = 'none';
-            agentIndicator.classList.remove('talking');
-            agentStatusText.textContent = 'Agent Ready';
-        });
+            // Initialize Retell client
+            const retellWebClient = new RetellWebClient();
+            
+            // UI elements
+            const callButton = document.getElementById('callButton');
+            const status = document.getElementById('status');
+            const agentStatus = document.getElementById('agentStatus');
+            const agentIndicator = document.getElementById('agentIndicator');
+            const agentStatusText = document.getElementById('agentStatusText');
+            const transcript = document.getElementById('transcript');
+            const transcriptContent = document.getElementById('transcriptContent');
+            
+            let isCallActive = false;
 
-        retellWebClient.on("agent_start_talking", () => {
-            console.log("Agent started talking");
-            agentIndicator.classList.add('talking');
-            agentStatusText.textContent = 'Agent Speaking...';
-        });
+            console.log('App initialized with agent:', agentId);
 
-        retellWebClient.on("agent_stop_talking", () => {
-            console.log("Agent stopped talking");
-            agentIndicator.classList.remove('talking');
-            agentStatusText.textContent = 'Agent Listening...';
-        });
+            // Update status display
+            function showStatus(message, type) {
+                status.textContent = message;
+                status.className = `status ${type}`;
+                status.style.display = 'block';
+            }
 
-        retellWebClient.on("update", (update) => {
-            console.log("Update received:", update);
-            updateTranscript(update);
-        });
+            // Update transcript
+            function updateTranscript(update) {
+                if (update.transcript) {
+                    transcriptContent.innerHTML += `<div>${update.transcript}</div>`;
+                    transcript.scrollTop = transcript.scrollHeight;
+                }
+            }
 
-        retellWebClient.on("error", (error) => {
-            console.error("Retell error:", error);
-            showStatus('Call error occurred. Please try again.', 'error');
-            isCallActive = false;
-            callButton.textContent = "🎤 Start Call";
-            callButton.disabled = false;
-            retellWebClient.stopCall();
-        });
+            // Call button click handler
+            callButton.addEventListener('click', async () => {
+                console.log('Button clicked! Current state:', isCallActive);
+                try {
+                    if (!isCallActive) {
+                        await startCall();
+                    } else {
+                        stopCall();
+                    }
+                } catch (error) {
+                    console.error('Click handler error:', error);
+                    showStatus('Error: ' + error.message, 'error');
+                }
+            });
 
-        // Update the embed code with current URL
-        window.addEventListener('load', () => {
+            // Start call function
+            async function startCall() {
+                try {
+                    console.log('Starting call with agent:', agentId);
+                    callButton.disabled = true;
+                    showStatus('Connecting...', 'connecting');
+
+                    console.log('Calling backend:', CONFIG.backendUrl);
+                    
+                    // Call your backend to create the call
+                    const response = await fetch(CONFIG.backendUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            agentId: agentId
+                        })
+                    });
+
+                    console.log('Backend response status:', response.status);
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('Backend error:', errorText);
+                        throw new Error(`Backend error: ${response.status} - ${errorText}`);
+                    }
+
+                    const callData = await response.json();
+                    console.log('Call data received:', callData);
+
+                    console.log('Starting Retell call...');
+                    
+                    // Start the call with Retell
+                    await retellWebClient.startCall({
+                        accessToken: callData.access_token,
+                        sampleRate: 24000,
+                        emitRawAudioSamples: false
+                    });
+
+                    console.log('Call started successfully');
+
+                } catch (error) {
+                    console.error('Error starting call:', error);
+                    showStatus('Failed to start call: ' + error.message, 'error');
+                    callButton.disabled = false;
+                }
+            }
+
+            // Stop call function
+            function stopCall() {
+                retellWebClient.stopCall();
+            }
+
+            // Event listeners
+            retellWebClient.on("call_started", () => {
+                console.log("Call started");
+                isCallActive = true;
+                callButton.textContent = "🔴 End Call";
+                callButton.disabled = false;
+                showStatus('Call Active - Speak now!', 'active');
+                agentStatus.style.display = 'block';
+                transcript.style.display = 'block';
+            });
+
+            retellWebClient.on("call_ended", () => {
+                console.log("Call ended");
+                isCallActive = false;
+                callButton.textContent = "🎤 Start Call";
+                callButton.disabled = false;
+                status.style.display = 'none';
+                agentStatus.style.display = 'none';
+                agentIndicator.classList.remove('talking');
+                agentStatusText.textContent = 'Agent Ready';
+            });
+
+            retellWebClient.on("agent_start_talking", () => {
+                console.log("Agent started talking");
+                agentIndicator.classList.add('talking');
+                agentStatusText.textContent = 'Agent Speaking...';
+            });
+
+            retellWebClient.on("agent_stop_talking", () => {
+                console.log("Agent stopped talking");
+                agentIndicator.classList.remove('talking');
+                agentStatusText.textContent = 'Agent Listening...';
+            });
+
+            retellWebClient.on("update", (update) => {
+                console.log("Update received:", update);
+                updateTranscript(update);
+            });
+
+            retellWebClient.on("error", (error) => {
+                console.error("Retell error:", error);
+                showStatus('Call error occurred. Please try again.', 'error');
+                isCallActive = false;
+                callButton.textContent = "🎤 Start Call";
+                callButton.disabled = false;
+                retellWebClient.stopCall();
+            });
+
+            // Update the embed code with current URL
             const currentDomain = window.location.origin;
             const embedCode = document.querySelector('.embed-code');
-            embedCode.innerHTML = embedCode.innerHTML.replace('https://your-netlify-site.netlify.app', currentDomain);
-        });
+            if (embedCode) {
+                embedCode.innerHTML = embedCode.innerHTML.replace('https://omnihive-webagent.netlify.app', currentDomain);
+            }
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', initializeApp);
     </script>
 </body>
 </html>
