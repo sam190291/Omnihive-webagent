@@ -1,3 +1,4 @@
+// netlify/functions/create-web-call.js
 exports.handler = async (event, context) => {
   // Handle CORS
   const headers = {
@@ -26,18 +27,8 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Parse request body safely
-    let agentId;
-    try {
-      const body = JSON.parse(event.body || '{}');
-      agentId = body.agentId;
-    } catch (parseError) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Invalid JSON in request body' })
-      };
-    }
+    // Parse request body
+    const { agentId } = JSON.parse(event.body || '{}');
 
     if (!agentId) {
       return {
@@ -47,7 +38,7 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Your Retell API key
+    // Your Retell API key (set this in Netlify environment variables)
     const retellApiKey = process.env.RETELL_API_KEY;
     
     if (!retellApiKey) {
@@ -59,10 +50,10 @@ exports.handler = async (event, context) => {
       };
     }
 
-    console.log('Calling Retell API for agent:', agentId);
+    console.log('Creating web call for agent:', agentId);
 
-    // Call Retell API to create web call
-    const retellResponse = await fetch('https://api.retellai.com/create-web-call', {
+    // Call Retell API V2 to create web call (using correct format)
+    const response = await fetch('https://api.retellai.com/v2/create-web-call', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${retellApiKey}`,
@@ -70,31 +61,33 @@ exports.handler = async (event, context) => {
       },
       body: JSON.stringify({
         agent_id: agentId,
+        agent_version: 1,
         metadata: {
           user_id: 'web-user',
           source: 'omnihive-website'
-        }
+        },
+        retell_llm_dynamic_variables: {}
       })
     });
 
-    console.log('Retell API response status:', retellResponse.status);
+    console.log('Retell API response status:', response.status);
 
-    if (!retellResponse.ok) {
-      const errorText = await retellResponse.text();
-      console.error('Retell API error:', retellResponse.status, errorText);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Retell API error:', response.status, errorText);
       return {
-        statusCode: retellResponse.status,
+        statusCode: response.status,
         headers,
         body: JSON.stringify({ 
-          error: 'Failed to create call with Retell',
+          error: 'Failed to create call',
           details: errorText,
-          status: retellResponse.status
+          retell_status: response.status
         })
       };
     }
 
-    const callData = await retellResponse.json();
-    console.log('Call created successfully');
+    const callData = await response.json();
+    console.log('Web call created successfully');
 
     return {
       statusCode: 200,
@@ -103,14 +96,13 @@ exports.handler = async (event, context) => {
     };
 
   } catch (error) {
-    console.error('Error in function:', error);
+    console.error('Error creating call:', error);
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({ 
         error: 'Internal server error',
-        message: error.message,
-        stack: error.stack
+        message: error.message 
       })
     };
   }
