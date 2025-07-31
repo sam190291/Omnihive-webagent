@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omnihive Web Agent</title>
+</head>
+<body>
+    <div class="call-container">
+        <h2>Omnihive AI Assistant</h2>
+        
+        <button id="callButton" class="call-button">
+            🎤 Start Call
+        </button>
+        
+        <div id="status" class="status" style="display: none;"></div>
+        
+        <div id="agentStatus" style="display: none;">
+            <span class="agent-indicator" id="agentIndicator"></span>
+            <span id="agentStatusText">Agent Ready</span>
+        </div>
+        
+        <div id="transcript" class="transcript" style="display: none;">
+            <strong>Conversation:</strong><br>
+            <div id="transcriptContent"></div>
+        </div>
+        
+        <div class="embed-info">
+            <h3>For Frontend Team:</h3>
+            <p>To embed this button, add this iframe to your website:</p>
+            <div class="embed-code">
+                &lt;iframe src="https://omnihive-webagent.netlify.app/?agentId=YOUR_AGENT_ID" width="100%" height="500" frameborder="0"&gt;&lt;/iframe&gt;
+            </div>
+            <p><strong>To use different agents:</strong> Just change the agentId parameter in the URL</p>
+        </div>
+    </div>
+</body>
+</html>
